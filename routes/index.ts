@@ -1,12 +1,23 @@
-import { Router, Request, Response, NextFunction } from 'https://deno.land/x/opine@1.3.2/mod.ts';
+import {
+    Router,
+    Request,
+    Response,
+    NextFunction
+} from 'https://deno.land/x/opine@1.3.2/mod.ts';
 
-//import { multiParser, Form } from 'https://deno.land/x/multiparser@v2.1.0/mod.ts';
-import { parse } from "https://raw.githubusercontent.com/mayankchoubey/deno-body-parser/main/mod.ts"
+import {
+    parse
+} from "https://raw.githubusercontent.com/mayankchoubey/deno-body-parser/main/mod.ts"
 
 const router = Router();
 
 const EMPTY = '';
 const BREAK = '\n';
+
+const upperKebab = (input: string) => input.trim()
+    .split('-')
+    .map(w => `${w[0].toUpperCase()}${w.slice(1).toLowerCase()}`)
+    .join('-');
 
 /** 
  * Should the output of large POSTs in the console be snipped 
@@ -29,7 +40,7 @@ async function echoMultipartPost(req: Request, res: Response, _next: NextFunctio
         
         return (output : string) => {
 
-            Deno.writeTextFileSync(outputFile, output);
+            Deno.writeTextFileSync(outputFile, `${output}\n`, { append: true });
             const contentLength = output.length;
             if (!snipLargeContent || contentLength <= maxLength) {
                 console.log(output);
@@ -50,10 +61,10 @@ async function echoMultipartPost(req: Request, res: Response, _next: NextFunctio
     let contentType = '';
 
     // Print the request headers and obtain Content-Type
-    for (const header in req.headers.keys()) {
-        echo(header + ": " + req.headers.get(header));
+    for (const header of req.headers.keys()) {
+        echo(upperKebab(header.trim()) + ": " + req.headers.get(header));
         if (header.toLowerCase() === 'content-type') {
-            contentType = req.headers.get(header)!.toLowerCase();
+            contentType = req.headers.get(header)!.toLowerCase().trim();
         }
     }
 
@@ -64,8 +75,6 @@ async function echoMultipartPost(req: Request, res: Response, _next: NextFunctio
         const boundary = (parsed && parsed.length) ? (parsed[1] || parsed[2]) : "";
         return boundary.replace(/\"/g, "");
     })();
-
-    console.log({ boundary });
 
     // No boundary indentified => single part content
     if (!boundary.length) {
@@ -100,94 +109,52 @@ async function echoMultipartPost(req: Request, res: Response, _next: NextFunctio
     }
 
     // Boundary identified => process for multipart content
-
-    //const mr = new mime.MultipartReader('', boundary);
-    console.log(`${BREAK}^^ MULTIPART POST LOGGED @ ${new Date()} ^^${BREAK}`);
-
-    // deno-body-parser will parse raw text
+    // deno-body-parser will parse raw text - we do the rest...
     const body = await parse(req, { unknownAsText: true });
+    const MULTIPART = ['alternative', 'related'].map(m => `multipart/${m}`);
 
-    if (body) {
-        const { txt }: { txt: string, json: Record<string, unknown>} = body;
-        //console.log({ txt, json });
-        const contentType = req.headers.get('content-type');
-        //console.log({ contentType });
+    if (body && MULTIPART.some(m => contentType.startsWith(m))) {
+        const { txt }: { txt: string } = body;
 
-        if (contentType?.toLowerCase().trim().startsWith('multipart/alternative')) {
-            // TODO multipart/related etc.
+        // Maanually split the text by the boundary
+        const parts = txt.trim()
+            .split(`--${boundary}`)
+            .map(p => p.trim().split('\n\n'));
 
-            // Maanually split the text by the boundary
-            const parts = txt.trim()
-                .split(`--${boundary}`)
-                .map(p => p.trim().split('\n\n'));
-            console.log(parts);
-
-            // Map the headers to an object and the body to a string property
-            const multipartMessage = parts
-                .filter(p => p.length === 2)
-                .map(([headers, body]) => ({
-                    headers: Object.assign(
-                        {},
-                        ...headers.split('\n')
-                            .map(h => h.split(':'))
-                            .map(([key, value]) => ({ [key.trim()]: value.trim() }))
-                    ),
-                    body
-                }));
-            
-            console.log(multipartMessage);
-        }
-    }
-    /*
-    var form = new multiparty.Form();
-    form.on('part', function (part) {
-         
-        // Detect base64 encoding to print nicely to the console
-        const isBase64 = (() => {
-            const transferEncoding = part.headers[Object.keys(part.headers)
-                .find(key => key.toLowerCase() === 'content-transfer-encoding')];
-            if (transferEncoding && transferEncoding.toLowerCase() == 'base64') {
-                return true;
-            }
-            return false;
-        })();
-
-        if (isBase64) {
-            part.setEncoding('base64');
-        }
-
-        // Get the body content of the MIME part
-        getContentFromReadableStream(part, (content) => {
-
+        // Map the headers to an object and the body to a string property
+        const multipartMessage = parts
+            .filter(p => p.length === 2)
+            .map(([headers, body]) => ({
+                headers: Object.assign(
+                    {},
+                    ...headers.split('\n')
+                        .map(h => h.split(':'))
+                        .map(([key, value]) => ({ [key.trim()]: value.trim() }))
+                ),
+                body
+            }));
+        
+        // Format the parts
+        for (const part of multipartMessage) {
             echo(BREAK + '--' + boundary);
 
             // Print the part's headers
-            for (let header in part.headers) {
-                echo(header + ': ' + part.headers[header]);
+            for (const header in part.headers) {
+                echo(upperKebab(header) + ': ' + part.headers[header]);
             }
             
-            echo(BLANK);
-            echo(content);
+            echo(EMPTY);
+            echo(part.body);
 
-            // Continue with the next part
-            part.resume();
+        }
 
-        });
-
-        part.on('error', function (err) {
-            console.error(err);
-        });
-
-    }).on('close', function () {
+        // Print the terminating boundary
         echo(BREAK + '--' + boundary + '--');
+
         // Send the response when reading the form has finished
         res.sendStatus(200);
         console.log(`${BREAK}^^ MULTIPART POST LOGGED @ ${new Date()} ^^${BREAK}`);
-    });
-
-    // Process the incoming request
-    form.parse(req);
-    */
+    }
 }
 
 
@@ -196,7 +163,6 @@ async function echoMultipartPost(req: Request, res: Response, _next: NextFunctio
 router.post('/echo', echoMultipartPost);
 
 router.post('/test', (_req, res, _next) => {
-    //console.log(req.body);
     res.sendStatus(200);
 });
 
