@@ -2,5 +2,9 @@
   "typescript.tsdk": "node_modules/typescript/lib",
   "deno.enable": true,
   "deno.lint": true,
-  "deno.unstable": true
+  "deno.unstable": true,
+  "deno.suggest.imports.hosts": {
+    "https://raw.githubusercontent.com": false,
+    "https://deno.land": true
+  }
 }
