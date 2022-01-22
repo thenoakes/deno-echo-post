@@ -1,13 +1,19 @@
 import { newEcho } from "../output/echo.ts";
-import { NextFunction, parse, Request, Response, Router } from "../deps.ts";
+import {
+  NextFunction,
+  OpineRequest,
+  OpineResponse,
+  parse,
+  Router,
+} from "../deps.ts";
 import { EMPTY, LF, upperKebab } from "../text/index.ts";
 
 const router = Router();
 
 /** A function which takes an incoming POST request and prints it, raw, to the screen and to a file */
 async function echoMultipartPost(
-  req: Request,
-  res: Response,
+  req: OpineRequest,
+  res: OpineResponse,
   _next: NextFunction,
 ) {
   const { echoBoth, echoScreen } = newEcho();
@@ -68,7 +74,7 @@ async function echoMultipartPost(
   if (body && MULTIPART.some((m) => contentType.startsWith(m))) {
     const { txt }: { txt: string } = body;
 
-    // Maanually split the text by the boundary
+    // Manually split the text by the boundary
     const parts = txt.trim()
       .split(`--${boundary}`)
       .map((p) => p.trim().split("\n\n"));
