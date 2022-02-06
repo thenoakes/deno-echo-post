@@ -8,5 +8,5 @@ export type {
   OpineResponse,
 } from "https://deno.land/x/opine@2.1.1/mod.ts";
 export { json, opine, Router } from "https://deno.land/x/opine@2.1.1/mod.ts";
-export { parse } from "https://raw.githubusercontent.com/thenoakes/deno-body-parser/4a3b0de7c3dab5da05f35b168a34404ad2ff820d/mod.ts";
+export { parse } from "https://raw.githubusercontent.com/thenoakes/deno-body-parser/3f998b3e628bec68161e28ae56ae5fd9b6bee148/mod.ts";
 export { EOL, format } from "https://deno.land/std@0.101.0/fs/eol.ts";
